@@ -1,26 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
-
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// --- CONNECT TO MONGODB ---
-// This line looks at your Render "Environment" settings to find the database link
-const mongoURI = process.env.MONGO_URI; 
-
-if (!mongoURI) {
-    console.error("ERROR: MONGO_URI is missing from Render Environment Variables!");
-}
-
-mongoose.connect(mongoURI)
-    .then(() => console.log("Connected to MongoDB Vault!"))
-    .catch(err => console.error("Database connection error:", err));
-
-// --- DATA BLUEPRINTS (Schemas) ---
+// Connect to MongoDB using the Render Environment Variable
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("Connected to MongoDB!"))
+    .catch(err => console.error("Connection error:", err));
 
 const ThreadSchema = new mongoose.Schema({
     author: { type: String, default: 'Anonymous' },
@@ -34,118 +23,31 @@ const ThreadSchema = new mongoose.Schema({
     }]
 });
 
-const BandSchema = new mongoose.Schema({
-    name: String,
-    genre: String,
-    country: String,
-    years: String,
-    status: String,
-    members: String,
-    description: String,
-    slug: { type: String, unique: true },
-    albums: [{ 
-        title: String, 
-        year: String, 
-        slug: String, 
-        tracks: Array 
-    }]
-});
-
 const Thread = mongoose.model('Thread', ThreadSchema);
-const Band = mongoose.model('Band', BandSchema);
 
-// ==========================================
-//               FORUM ROUTES
-// ==========================================
-
+// Routes
 app.get('/threads', async (req, res) => {
-    try {
-        const threads = await Thread.find().sort({ timestamp: -1 });
-        res.json(threads);
-    } catch (err) {
-        res.status(500).json({ error: "Could not fetch threads" });
-    }
+    const threads = await Thread.find().sort({ timestamp: -1 });
+    res.json(threads);
 });
 
 app.get('/threads/:id', async (req, res) => {
-    try {
-        const thread = await Thread.findById(req.params.id);
-        res.json(thread);
-    } catch (err) {
-        res.status(404).json({ error: "Thread not found" });
-    }
+    const thread = await Thread.findById(req.params.id);
+    res.json(thread);
 });
 
 app.post('/threads', async (req, res) => {
-    try {
-        const newThread = new Thread(req.body);
-        await newThread.save();
-        res.status(201).json(newThread);
-    } catch (err) {
-        res.status(400).json({ error: "Failed to create thread" });
-    }
+    const newThread = new Thread(req.body);
+    await newThread.save();
+    res.status(201).json(newThread);
 });
 
 app.post('/threads/:id/replies', async (req, res) => {
-    try {
-        const thread = await Thread.findById(req.params.id);
-        thread.replies.push(req.body);
-        await thread.save();
-        res.status(201).json(thread);
-    } catch (err) {
-        res.status(400).json({ error: "Failed to add reply" });
-    }
+    const thread = await Thread.findById(req.params.id);
+    thread.replies.push(req.body);
+    await thread.save();
+    res.status(201).json(thread);
 });
 
-// ==========================================
-//               CRYPT ROUTES
-// ==========================================
-
-app.get('/bands', async (req, res) => {
-    try {
-        const bands = await Band.find();
-        res.json(bands);
-    } catch (err) {
-        res.status(500).json({ error: "Could not fetch bands" });
-    }
-});
-
-app.post('/bands', async (req, res) => {
-    try {
-        const newBand = new Band(req.body);
-        await newBand.save();
-        res.status(201).json(newBand);
-    } catch (err) {
-        res.status(400).json({ error: "Failed to create band" });
-    }
-});
-
-app.put('/bands/:slug', async (req, res) => {
-    try {
-        const updatedBand = await Band.findOneAndUpdate(
-            { slug: req.params.slug }, 
-            req.body, 
-            { new: true }
-        );
-        res.json(updatedBand);
-    } catch (err) {
-        res.status(400).json({ error: "Failed to update band" });
-    }
-});
-
-app.post('/bands/:slug/albums', async (req, res) => {
-    try {
-        const band = await Band.findOne({ slug: req.params.slug });
-        band.albums.push(req.body);
-        await band.save();
-        res.status(201).json(req.body);
-    } catch (err) {
-        res.status(400).json({ error: "Failed to add album" });
-    }
-});
-
-// Start the server
 const PORT = process.env.PORT || 1000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server on ${PORT}`));
