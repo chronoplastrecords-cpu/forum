@@ -9,8 +9,12 @@ app.use(cors());
 app.use(express.json());
 
 // --- CONNECT TO MONGODB ---
-// Replace <db_password> with your actual database password!
-const mongoURI = "mongodb+srv://cameronjamesbatista_db_user:<db_password>@forum.fa95vhy.mongodb.net/?appName=Forum";
+// This line looks at your Render "Environment" settings to find the database link
+const mongoURI = process.env.MONGO_URI; 
+
+if (!mongoURI) {
+    console.error("ERROR: MONGO_URI is missing from Render Environment Variables!");
+}
 
 mongoose.connect(mongoURI)
     .then(() => console.log("Connected to MongoDB Vault!"))
@@ -54,7 +58,6 @@ const Band = mongoose.model('Band', BandSchema);
 //               FORUM ROUTES
 // ==========================================
 
-// Get all threads
 app.get('/threads', async (req, res) => {
     try {
         const threads = await Thread.find().sort({ timestamp: -1 });
@@ -64,7 +67,6 @@ app.get('/threads', async (req, res) => {
     }
 });
 
-// Get single thread
 app.get('/threads/:id', async (req, res) => {
     try {
         const thread = await Thread.findById(req.params.id);
@@ -74,7 +76,6 @@ app.get('/threads/:id', async (req, res) => {
     }
 });
 
-// Post new thread
 app.post('/threads', async (req, res) => {
     try {
         const newThread = new Thread(req.body);
@@ -85,7 +86,6 @@ app.post('/threads', async (req, res) => {
     }
 });
 
-// Post reply
 app.post('/threads/:id/replies', async (req, res) => {
     try {
         const thread = await Thread.findById(req.params.id);
@@ -101,7 +101,6 @@ app.post('/threads/:id/replies', async (req, res) => {
 //               CRYPT ROUTES
 // ==========================================
 
-// Get all bands
 app.get('/bands', async (req, res) => {
     try {
         const bands = await Band.find();
@@ -111,7 +110,6 @@ app.get('/bands', async (req, res) => {
     }
 });
 
-// Post new band
 app.post('/bands', async (req, res) => {
     try {
         const newBand = new Band(req.body);
@@ -122,7 +120,6 @@ app.post('/bands', async (req, res) => {
     }
 });
 
-// Edit band (Update)
 app.put('/bands/:slug', async (req, res) => {
     try {
         const updatedBand = await Band.findOneAndUpdate(
@@ -136,7 +133,6 @@ app.put('/bands/:slug', async (req, res) => {
     }
 });
 
-// Add album to band
 app.post('/bands/:slug/albums', async (req, res) => {
     try {
         const band = await Band.findOne({ slug: req.params.slug });
