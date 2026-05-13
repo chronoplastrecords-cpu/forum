@@ -6,11 +6,9 @@ const path = require('path');
 const app = express();
 
 // Middleware
+// CORS is the magic that allows Netlify to talk to Render!
 app.use(cors());
 app.use(express.json());
-
-// ADDED THIS LINE: Tells Express to serve your HTML, CSS, and images
-app.use(express.static(__dirname)); 
 
 const DATA_FILE = path.join(__dirname, 'threads.json');
 
@@ -106,5 +104,5 @@ app.post('/threads/:id/replies', (req, res) => {
 // Start the server
 const PORT = process.env.PORT || 1000;
 app.listen(PORT, () => {
-    console.log(`Forum server running on port ${PORT}`);
+    console.log(`Forum API server running on port ${PORT}`);
 });
