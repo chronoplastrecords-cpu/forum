@@ -68,7 +68,6 @@
 
     <script>
         // --- CONFIGURATION ---
-        // Replace this with your Render URL once deployed (e.g., https://your-app.onrender.com)
         const API_URL = 'https://forum-02bp.onrender.com'; 
 
         // Autoscroll image strip
@@ -144,6 +143,8 @@
             const threads = await response.json();
             const thread = threads.find(t => t.id == id);
 
+            if (!thread) return; // Failsafe if thread is deleted
+
             const detailContent = document.getElementById('thread-detail-content');
             detailContent.innerHTML = `
             <div class="thread-detail">
@@ -194,9 +195,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(replyData)
                 });
+                
+                // Refresh the current thread detail view after replying
                 showThreadDetail(id);
             };
         }
+
+        // --- EVENT LISTENERS ---
 
         document.getElementById('new-thread-form').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -213,16 +218,30 @@
             });
 
             document.getElementById('new-thread-form').reset();
-            renderThreadsList();
+            renderThreadsList(); // Update immediately on post
         });
 
         document.getElementById('back-button').onclick = () => {
             document.getElementById('thread-detail-view').classList.add('hidden');
             document.getElementById('threads-view').classList.remove('hidden');
-            renderThreadsList();
+            renderThreadsList(); // Refresh list when going back
         };
 
+        // --- INITIALIZATION & POLLING ---
+        
+        // Initial load
         renderThreadsList();
+
+        // REAL-TIME POLLING: Checks the server every 5 seconds for new threads
+        setInterval(() => {
+            // Only update the main list if the user is currently looking at it
+            // (This prevents the list from resetting while they are inside a specific thread)
+            const threadsView = document.getElementById('threads-view');
+            if (!threadsView.classList.contains('hidden')) {
+                renderThreadsList();
+            }
+        }, 5000); 
+
     </script>
 </body>
 </html>
