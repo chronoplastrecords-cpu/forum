@@ -83,7 +83,7 @@ app.post('/threads/:id/replies', (req, res) => {
     res.status(201).json(threads[threadIndex]);
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 1000;
 app.listen(PORT, () => {
     console.log(`Forum server running on port ${PORT}`);
 });
