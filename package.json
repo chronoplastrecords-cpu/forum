@@ -1,15 +1,12 @@
 {
-  "name": "chronoplast-forum-api",
+  "name": "chat-server",
   "version": "1.0.0",
+  "description": "Backend for my website chat",
   "main": "server.js",
-  "engines": {
-    "node": "20.x"
-  },
-  "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5"
-  },
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.2"
   }
 }
