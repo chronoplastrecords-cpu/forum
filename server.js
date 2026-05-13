@@ -9,10 +9,15 @@ app.use(express.json());
 
 const DATA_FILE = path.join(__dirname, 'threads.json');
 
+// Ensure the JSON file exists so readData doesn't break
+if (!fs.existsSync(DATA_FILE)) {
+    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
+}
+
 const readData = () => {
     try {
-        if (!fs.existsSync(DATA_FILE)) return [];
-        return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+        const content = fs.readFileSync(DATA_FILE, 'utf8');
+        return JSON.parse(content);
     } catch (err) {
         console.error('Failed to read threads file:', err);
         return [];
@@ -49,7 +54,6 @@ app.post('/threads', (req, res) => {
 
     threads.push(newThread);
     writeData(threads);
-
     res.status(201).json(newThread);
 });
 
@@ -60,9 +64,9 @@ app.post('/threads/:id/replies', (req, res) => {
     }
 
     const threads = readData();
-    const thread = threads.find((t) => t.id === req.params.id);
+    const threadIndex = threads.findIndex((t) => t.id === req.params.id);
 
-    if (!thread) {
+    if (threadIndex === -1) {
         return res.status(404).json({ error: 'Thread not found' });
     }
 
@@ -72,11 +76,11 @@ app.post('/threads/:id/replies', (req, res) => {
         timestamp: Date.now()
     };
 
-    thread.replies = thread.replies || [];
-    thread.replies.push(reply);
+    threads[threadIndex].replies = threads[threadIndex].replies || [];
+    threads[threadIndex].replies.push(reply);
+    
     writeData(threads);
-
-    res.status(201).json(thread);
+    res.status(201).json(threads[threadIndex]);
 });
 
 const PORT = process.env.PORT || 3000;
