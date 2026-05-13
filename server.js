@@ -1,108 +1,155 @@
 const express = require('express');
-const cors = require('cors'); 
-const fs = require('fs');
-const path = require('path');
+const cors = require('cors');
+const mongoose = require('mongoose');
 
 const app = express();
 
 // Middleware
-// CORS is the magic that allows Netlify to talk to Render!
 app.use(cors());
 app.use(express.json());
 
-const DATA_FILE = path.join(__dirname, 'threads.json');
+// --- CONNECT TO MONGODB ---
+// Replace <db_password> with your actual database password!
+const mongoURI = "mongodb+srv://cameronjamesbatista_db_user:<db_password>@forum.fa95vhy.mongodb.net/?appName=Forum";
 
-// Ensure the JSON file exists so readData doesn't break
-if (!fs.existsSync(DATA_FILE)) {
-    fs.writeFileSync(DATA_FILE, JSON.stringify([], null, 2));
-}
+mongoose.connect(mongoURI)
+    .then(() => console.log("Connected to MongoDB Vault!"))
+    .catch(err => console.error("Database connection error:", err));
 
-const readData = () => {
+// --- DATA BLUEPRINTS (Schemas) ---
+
+const ThreadSchema = new mongoose.Schema({
+    author: { type: String, default: 'Anonymous' },
+    title: String,
+    body: String,
+    timestamp: { type: Date, default: Date.now },
+    replies: [{ 
+        author: { type: String, default: 'Anonymous' }, 
+        text: String, 
+        timestamp: { type: Date, default: Date.now } 
+    }]
+});
+
+const BandSchema = new mongoose.Schema({
+    name: String,
+    genre: String,
+    country: String,
+    years: String,
+    status: String,
+    members: String,
+    description: String,
+    slug: { type: String, unique: true },
+    albums: [{ 
+        title: String, 
+        year: String, 
+        slug: String, 
+        tracks: Array 
+    }]
+});
+
+const Thread = mongoose.model('Thread', ThreadSchema);
+const Band = mongoose.model('Band', BandSchema);
+
+// ==========================================
+//               FORUM ROUTES
+// ==========================================
+
+// Get all threads
+app.get('/threads', async (req, res) => {
     try {
-        const content = fs.readFileSync(DATA_FILE, 'utf8');
-        return JSON.parse(content);
+        const threads = await Thread.find().sort({ timestamp: -1 });
+        res.json(threads);
     } catch (err) {
-        console.error('Failed to read threads file:', err);
-        return [];
+        res.status(500).json({ error: "Could not fetch threads" });
     }
-};
+});
 
-const writeData = (data) => {
+// Get single thread
+app.get('/threads/:id', async (req, res) => {
     try {
-        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+        const thread = await Thread.findById(req.params.id);
+        res.json(thread);
     } catch (err) {
-        console.error('Failed to write threads file:', err);
+        res.status(404).json({ error: "Thread not found" });
     }
-};
-
-// GET all threads
-app.get('/threads', (req, res) => {
-    res.json(readData());
 });
 
-// GET a single thread by ID
-app.get('/threads/:id', (req, res) => {
-    const threads = readData();
-    const thread = threads.find((t) => t.id === req.params.id);
-    
-    if (!thread) {
-        return res.status(404).json({ error: 'Thread not found' });
+// Post new thread
+app.post('/threads', async (req, res) => {
+    try {
+        const newThread = new Thread(req.body);
+        await newThread.save();
+        res.status(201).json(newThread);
+    } catch (err) {
+        res.status(400).json({ error: "Failed to create thread" });
     }
-    res.json(thread);
 });
 
-// POST a new thread
-app.post('/threads', (req, res) => {
-    const { author, title, body } = req.body;
-    if (!title || !body) {
-        return res.status(400).json({ error: 'Title and body are required' });
+// Post reply
+app.post('/threads/:id/replies', async (req, res) => {
+    try {
+        const thread = await Thread.findById(req.params.id);
+        thread.replies.push(req.body);
+        await thread.save();
+        res.status(201).json(thread);
+    } catch (err) {
+        res.status(400).json({ error: "Failed to add reply" });
     }
-
-    const threads = readData();
-    const newThread = {
-        id: Date.now().toString(),
-        author: author?.trim() || 'Anonymous',
-        title: title.trim(),
-        body: body.trim(),
-        timestamp: Date.now(),
-        replies: []
-    };
-
-    threads.push(newThread);
-    writeData(threads);
-    res.status(201).json(newThread);
 });
 
-// POST a reply to a thread
-app.post('/threads/:id/replies', (req, res) => {
-    const { author, text } = req.body;
-    if (!text) {
-        return res.status(400).json({ error: 'Reply text is required' });
+// ==========================================
+//               CRYPT ROUTES
+// ==========================================
+
+// Get all bands
+app.get('/bands', async (req, res) => {
+    try {
+        const bands = await Band.find();
+        res.json(bands);
+    } catch (err) {
+        res.status(500).json({ error: "Could not fetch bands" });
     }
+});
 
-    const threads = readData();
-    const threadIndex = threads.findIndex((t) => t.id === req.params.id);
-
-    if (threadIndex === -1) {
-        return res.status(404).json({ error: 'Thread not found' });
+// Post new band
+app.post('/bands', async (req, res) => {
+    try {
+        const newBand = new Band(req.body);
+        await newBand.save();
+        res.status(201).json(newBand);
+    } catch (err) {
+        res.status(400).json({ error: "Failed to create band" });
     }
+});
 
-    const reply = {
-        author: author?.trim() || 'Anonymous',
-        text: text.trim(),
-        timestamp: Date.now()
-    };
+// Edit band (Update)
+app.put('/bands/:slug', async (req, res) => {
+    try {
+        const updatedBand = await Band.findOneAndUpdate(
+            { slug: req.params.slug }, 
+            req.body, 
+            { new: true }
+        );
+        res.json(updatedBand);
+    } catch (err) {
+        res.status(400).json({ error: "Failed to update band" });
+    }
+});
 
-    // Ensure replies array exists, then push the new reply
-    threads[threadIndex].replies = threads[threadIndex].replies || [];
-    threads[threadIndex].replies.push(reply);
-    
-    writeData(threads);
-    res.status(201).json(threads[threadIndex]);
+// Add album to band
+app.post('/bands/:slug/albums', async (req, res) => {
+    try {
+        const band = await Band.findOne({ slug: req.params.slug });
+        band.albums.push(req.body);
+        await band.save();
+        res.status(201).json(req.body);
+    } catch (err) {
+        res.status(400).json({ error: "Failed to add album" });
+    }
 });
 
 // Start the server
 const PORT = process.env.PORT || 1000;
 app.listen(PORT, () => {
-    console.log(`Forum API server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
