@@ -1,5 +1,5 @@
 const express = require('express');
-const cors = require('cors'); // Removed the duplicate require
+const cors = require('cors'); 
 const fs = require('fs');
 const path = require('path');
 
@@ -8,6 +8,9 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// ADDED THIS LINE: Tells Express to serve your HTML, CSS, and images
+app.use(express.static(__dirname)); 
 
 const DATA_FILE = path.join(__dirname, 'threads.json');
 
@@ -39,7 +42,7 @@ app.get('/threads', (req, res) => {
     res.json(readData());
 });
 
-// GET a single thread by ID (New Feature)
+// GET a single thread by ID
 app.get('/threads/:id', (req, res) => {
     const threads = readData();
     const thread = threads.find((t) => t.id === req.params.id);
