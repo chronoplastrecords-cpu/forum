@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Band Archives - Chronoplast Records</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="crypt.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manufacturing+Consent&display=swap" rel="stylesheet">
+    
+</head>
+
+<body>
+    <h1>Chronoplast Records Official Site</h1>
+
+    <div class="image-strip">
+        <img src="pics/207.jpg" alt="Record 1">
+        <img src="pics/928.jpg" alt="Record 2">
+        <img src="pics/3094.jpg" alt="Record 3">
+        <img src="pics/2746.jpg" alt="Record 4">
+        <img src="pics/16395.jpg" alt="Record 5">
+    </div>
+
+    <div class="tabs">
+        <div class="tab-row">
+            <a href="index.html" class="tab">Home</a>
+            <a href="forum.html" class="tab">Forum</a>
+            <button class="tab active">The Crypt</button>
+        </div>
+    </div>
+
+    <div class="archives-container">
+        <!-- List View -->
+        <div id="list-view">
+            <div class="archives-header">
+                <h2>Band Archives</h2>
+                <p>Catalog of bands in the Chronoplast Records community</p>
+            </div>
+
+            <div class="search-bar">
+                <input id="search-input" type="text" placeholder="Search bands by name or genre...">
+            </div>
+
+            <div class="add-band-section">
+                <h3>Add New Band</h3>
+                <form id="add-band-form">
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <label for="band-name">Band Name *</label>
+                            <input id="band-name" type="text" required placeholder="e.g., Metallica" maxlength="100">
+                        </div>
+                        <div class="form-row">
+                            <label for="band-genre">Genre *</label>
+                            <input id="band-genre" type="text" required placeholder="e.g., Thrash Metal" maxlength="50">
+                        </div>
+                        <div class="form-row">
+                            <label for="band-country">Country *</label>
+                            <input id="band-country" type="text" required placeholder="e.g., USA" maxlength="50">
+                        </div>
+                        <div class="form-row">
+                            <label for="band-years">Active Years *</label>
+                            <input id="band-years" type="text" required placeholder="e.g., 1981-present" maxlength="50">
+                        </div>
+                        <div class="form-row">
+                            <label for="band-status">Status *</label>
+                            <select id="band-status" required>
+                                <option value="">-- Select --</option>
+                                <option value="active">Active</option>
+                                <option value="disbanded">Disbanded</option>
+                                <option value="hiatus">On Hiatus</option>
+                                <option value="reunion">Reunion</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <label for="band-members">Current Members</label>
+                            <input id="band-members" type="text" placeholder="Comma-separated names" maxlength="200">
+                        </div>
+                        <div class="form-row full">
+                            <label for="band-description">Description *</label>
+                            <textarea id="band-description" required placeholder="Band bio, notable albums, history, etc..."></textarea>
+                        </div>
+                    </div>
+                    <button type="submit" class="submit-button">Add Band</button>
+                </form>
+                <div id="form-message" class="message hidden"></div>
+            </div>
+
+            <div id="bands-container" class="bands-list">
+                <div class="empty-state">No bands yet. Add the first band to get started!</div>
+            </div>
+        </div>
+
+        <!-- Detail View -->
+        <div id="detail-view" class="hidden">
+            <button id="back-button" class="back-button">← Back to all bands</button>
+            <div id="band-detail-content"></div>
+        </div>
+    </div>
+
+    <script>
+        // Autoscroll image strip
+        window.addEventListener('load', () => {
+            const strip = document.querySelector('.image-strip');
+            if (strip) {
+                const speed = 0.5;
+                let position = 0;
+
+                function animate() {
+                    const maxScroll = strip.scrollWidth - strip.clientWidth;
+                    if (maxScroll <= 0) return;
+                    position += speed;
+                    if (position >= maxScroll) {
+                        position = 0;
+                    }
+                    strip.scrollLeft = position;
+                    requestAnimationFrame(animate);
+                }
+
+                animate();
+            }
+        });
+
+        const storageKey = 'chronoplastBands';
+
+        function getQueryParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
+        function slugify(text) {
+            return text
+                .toString()
+                .trim()
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        }
+
+        function createUniqueSlug(name, bands, existingSlug = '') {
+            const base = slugify(name) || 'band';
+            const used = new Set(bands.map((band) => band.slug).filter(Boolean));
+            if (existingSlug) {
+                used.delete(existingSlug);
+            }
+            let slug = base;
+            let counter = 1;
+            while (used.has(slug)) {
+                slug = `${base}-${counter++}`;
+            }
+            return slug;
+        }
+
+        function getBands() {
+            return JSON.parse(localStorage.getItem(storageKey) || '[]').map((band) => ({
+                ...band,
+                albums: band.albums || [],
+            }));
+        }
+
+        function saveBands(bands) {
+            localStorage.setItem(storageKey, JSON.stringify(bands));
+        }
+
+        function getBandBySlug(slug) {
+            return getBands().find((band) => band.slug === slug);
+        }
+
+        function createUniqueAlbumSlug(band, title, existingSlug = '') {
+            const base = slugify(`${band.slug}-${title}`) || 'album';
+            const used = new Set(
+                getBands()
+                    .flatMap((bandItem) => bandItem.albums || [])
+                    .map((album) => album.slug)
+                    .filter(Boolean)
+            );
+            if (existingSlug) {
+                used.delete(existingSlug);
+            }
+            let slug = base;
+            let counter = 1;
+            while (used.has(slug)) {
+                slug = `${base}-${counter++}`;
+            }
+            return slug;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderBandsList(searchTerm = '') {
+            const bands = getBands();
+            const container = document.getElementById('bands-container');
+            const items = bands
+                .map((band, index) => ({ band, index }))
+                .filter(({ band }) =>
+                    band.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                    band.genre.toLowerCase().includes(searchTerm.toLowerCase())
+                );
+
+            if (items.length === 0) {
+                container.innerHTML = '<div class="empty-state">No bands found. Try a different search or add a new band!</div>';
+                return;
+            }
+
+            container.innerHTML = items
+                .map(
+                    ({ band }) => `
+                <div class="band-card" onclick="window.location.href='crypt.html?band=${encodeURIComponent(band.slug)}'">
+                    <h3 class="band-name">${escapeHtml(band.name)}</h3>
+                    <p class="band-meta">📍 ${escapeHtml(band.country)}</p>
+                    <p class="band-meta">🎵 ${escapeHtml(band.genre)}</p>
+                    <p class="band-meta">📅 ${escapeHtml(band.years)}</p>
+                    <span class="band-status ${band.status}">${band.status.charAt(0).toUpperCase() + band.status.slice(1)}</span>
+                    <p class="band-description">${escapeHtml(band.description)}</p>
+                </div>
+            `
+                )
+                .join('');
+        }
+
+        function showBandDetail(index) {
+            const bands = getBands();
+            const band = bands[index];
+            bandCurrent = band;
+
+            const detailContent = document.getElementById('band-detail-content');
+            detailContent.innerHTML = `
+            <div class="band-detail-view">
+                <h2>${escapeHtml(band.name)}</h2>
+
+                <div class="band-detail-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Genre</div>
+                        <div>${escapeHtml(band.genre)}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Country</div>
+                        <div>${escapeHtml(band.country)}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Years Active</div>
+                        <div>${escapeHtml(band.years)}</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Status</div>
+                        <div><span class="band-status ${band.status}">${band.status.charAt(0).toUpperCase() + band.status.slice(1)}</span></div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">Albums</div>
+                        <div>${band.albums.length}</div>
+                    </div>
+                </div>
+
+                ${band.members ? `<div class="meta-item" style="grid-column: 1 / -1;">
+                    <div class="meta-label">Current Members</div>
+                    <div>${escapeHtml(band.members)}</div>
+                </div>` : ''}
+
+                <div class="band-detail-description">${escapeHtml(band.description)}</div>
+
+                <div class="album-section">
+                    <h3>Albums</h3>
+                    <div class="album-list">
+                        ${band.albums.length ? band.albums.map((album) => `
+                            <div class="album-card">
+                                <h4>${escapeHtml(album.title)} <span class="band-status active">${escapeHtml(album.year)}</span></h4>
+                                <p class="band-meta">Tracks: ${album.tracks ? album.tracks.filter((track) => track.title).length : 0}</p>
+                                ${album.tracks && album.tracks.length ? `
+                                    <div class="album-track-table">
+                                        ${album.tracks.map((track, idx) => `
+                                            <div class="album-track-row">
+                                                <span class="track-number">${escapeHtml(track.position || (idx + 1))}.</span>
+                                                <span class="track-title-text">${escapeHtml(track.title)}</span>
+                                                <span class="track-time-text">${escapeHtml(track.time || '??:??')}</span>
+                                                <button type="button" class="track-lyrics-button" data-album="${escapeHtml(album.slug)}" data-index="${idx}">Show lyrics</button>
+                                            </div>
+                                        `).join('')}
+                                        ${album.tracks.map((track, idx) => `
+                                            <div class="track-lyrics-panel hidden" id="lyrics-panel-${escapeHtml(album.slug)}-${idx}">
+                                                <div><strong>Lyrics</strong></div>
+                                                <div class="track-detail-text">${escapeHtml(track.lyrics || 'No lyrics entered.')}</div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                ` : '<div class="album-description">No tracks yet.</div>'}
+                                <div class="band-actions">
+                                    <a class="submit-button" href="album.html?album=${encodeURIComponent(album.slug)}">Album Page</a>
+                                </div>
+                            </div>
+                        `).join('') : '<div class="empty-state">No albums added yet.</div>'}
+                    </div>
+                </div>
+
+                <div class="add-album-section">
+                    <h3>Add Album</h3>
+                    <form id="add-album-form">
+                        <div class="form-grid">
+                            <div class="form-row">
+                                <label for="album-name">Album Name *</label>
+                                <input id="album-name" type="text" required maxlength="100" placeholder="Album title">
+                            </div>
+                            <div class="form-row">
+                                <label for="album-year">Year *</label>
+                                <input id="album-year" type="text" required maxlength="10" placeholder="e.g., 1995">
+                            </div>
+                        </div>
+                        <div class="track-listing">
+                            <h4>Track Listings</h4>
+                            <div id="album-track-rows">
+                                ${createTrackRowsHtml()}
+                            </div>
+                            <button type="button" class="track-action-button" id="add-track-button">Add Track</button>
+                        </div>
+                        <button type="submit" class="submit-button">Save Album</button>
+                        <div id="album-form-message" class="message hidden"></div>
+                    </form>
+                </div>
+
+                <div class="band-actions">
+                    <button class="edit-button" onclick="editBand(${index})">Edit</button>
+
+                </div>
+            </div>
+        `;
+
+            document.getElementById('list-view').classList.add('hidden');
+            document.getElementById('detail-view').classList.remove('hidden');
+            bindAlbumTrackToggles();
+            bindAddTrackButton();
+        }
+
+        function createTrackRowHtml() {
+            return `
+                <div class="track-row">
+                    <input class="track-position" type="text" placeholder="#" />
+                    <input class="track-title" type="text" placeholder="Track title" />
+                    <input class="track-time" type="text" placeholder="Time" />
+                    <input class="track-lyrics" type="text" placeholder="Lyrics" />
+                </div>
+            `;
+        }
+
+        function createTrackRowsHtml() {
+            return createTrackRowHtml();
+        }
+
+        function addTrackRow() {
+            const rowsContainer = document.getElementById('album-track-rows');
+            if (!rowsContainer) return;
+            rowsContainer.insertAdjacentHTML('beforeend', createTrackRowHtml());
+        }
+
+        function bindAddTrackButton() {
+            const addButton = document.getElementById('add-track-button');
+            if (addButton) {
+                addButton.addEventListener('click', addTrackRow);
+            }
+        }
+
+        function bindAlbumTrackToggles() {
+            document.querySelectorAll('.track-lyrics-button').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const albumSlug = button.dataset.album;
+                    const idx = button.dataset.index;
+                    const panel = document.getElementById(`lyrics-panel-${albumSlug}-${idx}`);
+                    if (!panel) return;
+                    panel.classList.toggle('hidden');
+                    button.textContent = panel.classList.contains('hidden') ? 'Show lyrics' : 'Hide lyrics';
+                });
+            });
+        }
+
+        let bandCurrent = null;
+
+        function showBandDetailBySlug(slug) {
+            const bands = getBands();
+            const index = bands.findIndex((band) => band.slug === slug);
+            if (index !== -1) {
+                showBandDetail(index);
+            } else {
+                document.getElementById('band-detail-content').innerHTML = '<div class="empty-state">Band not found. Make sure the band still exists.</div>';
+                document.getElementById('list-view').classList.add('hidden');
+                document.getElementById('detail-view').classList.remove('hidden');
+            }
+        }
+
+        function editBand(index) {
+            const bands = getBands();
+            const band = bands[index];
+
+            document.getElementById('band-name').value = band.name;
+            document.getElementById('band-genre').value = band.genre;
+            document.getElementById('band-country').value = band.country;
+            document.getElementById('band-years').value = band.years;
+            document.getElementById('band-status').value = band.status;
+            document.getElementById('band-members').value = band.members || '';
+            document.getElementById('band-description').value = band.description;
+
+            document.getElementById('add-band-form').dataset.editIndex = index;
+            document.getElementById('add-band-form').dataset.isEdit = 'true';
+
+            const submitButton = document.querySelector('#add-band-form button[type="submit"]');
+            submitButton.textContent = 'Update Band';
+
+            document.getElementById('list-view').classList.remove('hidden');
+            document.getElementById('detail-view').classList.add('hidden');
+
+            window.scrollTo(0, 0);
+        }
+
+        function addAlbumToBand(bandSlug, album) {
+            const bands = getBands();
+            const bandIndex = bands.findIndex((band) => band.slug === bandSlug);
+            if (bandIndex === -1) return;
+            bands[bandIndex].albums = bands[bandIndex].albums || [];
+            bands[bandIndex].albums.push(album);
+            saveBands(bands);
+        }
+
+        function deleteBand(index) {
+            if (!confirm('Are you sure you want to delete this band?')) return;
+
+            const bands = getBands();
+            bands.splice(index, 1);
+            saveBands(bands);
+
+            document.getElementById('list-view').classList.remove('hidden');
+            document.getElementById('detail-view').classList.add('hidden');
+            renderBandsList();
+        }
+
+        function fillFormForEdit(slug) {
+            const bands = getBands();
+            const index = bands.findIndex((band) => band.slug === slug);
+            if (index === -1) return;
+            editBand(index);
+        }
+
+        document.getElementById('add-band-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('band-name').value.trim();
+            const genre = document.getElementById('band-genre').value.trim();
+            const country = document.getElementById('band-country').value.trim();
+            const years = document.getElementById('band-years').value.trim();
+            const status = document.getElementById('band-status').value;
+            const members = document.getElementById('band-members').value.trim();
+            const description = document.getElementById('band-description').value.trim();
+            const formMessage = document.getElementById('form-message');
+
+            if (!name || !genre || !country || !years || !status || !description) {
+                formMessage.textContent = 'Please fill in all required fields.';
+                formMessage.className = 'message error';
+                return;
+            }
+
+            const bands = getBands();
+            const isEdit = document.getElementById('add-band-form').dataset.isEdit === 'true';
+            const editIndex = parseInt(document.getElementById('add-band-form').dataset.editIndex, 10);
+            const slug = isEdit
+                ? createUniqueSlug(name, bands, bands[editIndex] ? bands[editIndex].slug : '')
+                : createUniqueSlug(name, bands);
+
+            if (isEdit) {
+                const existingAlbums = bands[editIndex]?.albums || [];
+                bands[editIndex] = { name, genre, country, years, status, members, description, slug, albums: existingAlbums };
+                formMessage.textContent = 'Band updated successfully!';
+            } else {
+                bands.push({ name, genre, country, years, status, members, description, slug, albums: [] });
+                formMessage.textContent = 'Band added successfully!';
+            }
+
+            formMessage.className = 'message success';
+            saveBands(bands);
+            document.getElementById('add-band-form').reset();
+            document.getElementById('add-band-form').dataset.isEdit = 'false';
+            document.querySelector('#add-band-form button[type="submit"]').textContent = 'Add Band';
+            renderBandsList();
+
+            setTimeout(() => {
+                formMessage.className = 'message hidden';
+            }, 3000);
+        });
+
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            renderBandsList(e.target.value);
+        });
+
+        document.getElementById('back-button').addEventListener('click', () => {
+            document.getElementById('list-view').classList.remove('hidden');
+            document.getElementById('detail-view').classList.add('hidden');
+            document.getElementById('add-band-form').dataset.isEdit = 'false';
+            document.querySelector('#add-band-form button[type="submit"]').textContent = 'Add Band';
+        });
+
+        document.addEventListener('submit', (event) => {
+            if (event.target && event.target.id === 'add-album-form') {
+                event.preventDefault();
+                const bandSlug = getQueryParam('band');
+                const band = getBandBySlug(bandSlug);
+                if (!band) return;
+
+                const name = document.getElementById('album-name').value.trim();
+                const year = document.getElementById('album-year').value.trim();
+                const message = document.getElementById('album-form-message');
+
+                if (!name || !year) {
+                    message.textContent = 'Please enter album name and year.';
+                    message.className = 'message error';
+                    return;
+                }
+
+                const tracks = Array.from(document.querySelectorAll('.track-row')).map((row) => {
+                    const title = row.querySelector('.track-title').value;
+                    const lyrics = row.querySelector('.track-lyrics').value.trim();
+                    const time = row.querySelector('.track-time').value.trim();
+                    return { title, lyrics, time };
+                }).filter((track) => track.title);
+
+                const slug = createUniqueAlbumSlug(band, name);
+                addAlbumToBand(bandSlug, { title: name, year, tracks, slug });
+                message.textContent = 'Album added successfully!';
+                message.className = 'message success';
+                showBandDetailBySlug(bandSlug);
+            }
+        });
+
+        const editSlug = getQueryParam('edit');
+        if (editSlug) {
+            fillFormForEdit(editSlug);
+        }
+
+        const bandSlug = getQueryParam('band');
+        if (bandSlug) {
+            showBandDetailBySlug(bandSlug);
+        } else {
+            renderBandsList();
+        }
+    </script>
+</body>
+
+</html>

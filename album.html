@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Album Page - Chronoplast Records</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="crypt.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manufacturing+Consent&display=swap" rel="stylesheet">
+</head>
+<body>
+    <h1>Chronoplast Records Official Site</h1>
+
+    <div class="image-strip">
+        <img src="pics/207.jpg" alt="Record 1">
+        <img src="pics/928.jpg" alt="Record 2">
+        <img src="pics/3094.jpg" alt="Record 3">
+        <img src="pics/2746.jpg" alt="Record 4">
+        <img src="pics/16395.jpg" alt="Record 5">
+    </div>
+
+    <div class="tabs">
+        <div class="tab-row">
+            <a href="index.html" class="tab">Home</a>
+            <a href="forum.html" class="tab">Forum</a>
+            <a href="crypt.html" class="tab">The Crypt</a>
+            <a href="band.html" class="tab">Band Page</a>
+        </div>
+    </div>
+
+    <div class="archives-container">
+        <div id="album-page-content"></div>
+    </div>
+
+    <script>
+        const storageKey = 'chronoplastBands';
+
+        function getQueryParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function getBands() {
+            return JSON.parse(localStorage.getItem(storageKey) || '[]').map((band) => ({
+                ...band,
+                albums: band.albums || [],
+            }));
+        }
+
+        function getAlbumBySlug(slug) {
+            for (const band of getBands()) {
+                const album = (band.albums || []).find((item) => item.slug === slug);
+                if (album) return { album, band };
+            }
+            return null;
+        }
+
+        function createAlbumPageHtml(album, band) {
+            const title = escapeHtml(album.title);
+            const bandName = escapeHtml(band.name);
+            const year = escapeHtml(album.year);
+            const type = escapeHtml(album.type);
+            const label = escapeHtml(album.label || 'Unknown');
+            const format = escapeHtml(album.format || 'Unknown');
+            const description = escapeHtml(album.description).replace(/\n/g, '<br>');
+            const bandSlug = escapeHtml(band.slug);
+
+            return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title} - ${bandName} - Chronoplast Records</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="crypt.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manufacturing+Consent&display=swap" rel="stylesheet">
+</head>
+<body>
+    <h1>Chronoplast Records Official Site</h1>
+    <div class="image-strip">
+        <img src="pics/207.jpg" alt="Record 1">
+        <img src="pics/928.jpg" alt="Record 2">
+        <img src="pics/3094.jpg" alt="Record 3">
+        <img src="pics/2746.jpg" alt="Record 4">
+        <img src="pics/16395.jpg" alt="Record 5">
+    </div>
+    <div class="tabs">
+        <div class="tab-row">
+            <a href="index.html" class="tab">Home</a>
+            <a href="forum.html" class="tab">Forum</a>
+            <a href="crypt.html" class="tab">The Crypt</a>
+            <a href="band.html?band=${bandSlug}" class="tab">Band Page</a>
+        </div>
+    </div>
+    <div class="archives-container">
+        <div class="band-detail-view">
+            <h2>${title}</h2>
+            <div class="band-detail-meta">
+                <div class="meta-item"><div class="meta-label">Band</div><div>${bandName}</div></div>
+                <div class="meta-item"><div class="meta-label">Year</div><div>${year}</div></div>
+                <div class="meta-item"><div class="meta-label">Type</div><div>${type}</div></div>
+                <div class="meta-item"><div class="meta-label">Label</div><div>${label}</div></div>
+                <div class="meta-item"><div class="meta-label">Format</div><div>${format}</div></div>
+            </div>
+            <div class="band-detail-description">${description}</div>
+            <div class="band-actions">
+                <button class="submit-button" id="download-album-page">Download Album HTML</button>
+                <a class="back-button" href="band.html?band=${bandSlug}">Back to ${bandName}</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`;
+        }
+
+        function downloadAlbumPage(album, band) {
+            const html = createAlbumPageHtml(album, band);
+            const blob = new Blob([html], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${album.slug || 'album'}.html`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        function renderAlbumPage() {
+            const albumSlug = getQueryParam('album');
+            const container = document.getElementById('album-page-content');
+
+            if (!albumSlug) {
+                container.innerHTML = '<div class="empty-state">No album specified in the URL.</div>';
+                return;
+            }
+
+            const result = getAlbumBySlug(albumSlug);
+            if (!result) {
+                container.innerHTML = '<div class="empty-state">Album not found. Make sure it still exists.</div>';
+                return;
+            }
+
+            const { album, band } = result;
+            document.title = `${album.title} - ${band.name} - Chronoplast Records`;
+            container.innerHTML = `
+                <div class="band-detail-view">
+                    <h2>${escapeHtml(album.title)}</h2>
+                    <div class="band-detail-meta">
+                        <div class="meta-item"><div class="meta-label">Band</div><div>${escapeHtml(band.name)}</div></div>
+                        <div class="meta-item"><div class="meta-label">Year</div><div>${escapeHtml(album.year)}</div></div>
+                        <div class="meta-item"><div class="meta-label">Type</div><div>${escapeHtml(album.type)}</div></div>
+                        <div class="meta-item"><div class="meta-label">Label</div><div>${escapeHtml(album.label || 'Unknown')}</div></div>
+                        <div class="meta-item"><div class="meta-label">Format</div><div>${escapeHtml(album.format || 'Unknown')}</div></div>
+                    </div>
+                    <div class="band-detail-description">${escapeHtml(album.description).replace(/\n/g, '<br>')}</div>
+                    <div class="band-actions">
+                        <button class="submit-button" id="download-album-page">Download Album HTML</button>
+                        <a class="edit-button" href="band.html?band=${encodeURIComponent(band.slug)}&editAlbum=${encodeURIComponent(album.slug)}">Edit Album</a>
+                        <a class="back-button" href="band.html?band=${encodeURIComponent(band.slug)}">Back to ${escapeHtml(band.name)}</a>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('download-album-page').addEventListener('click', () => downloadAlbumPage(album, band));
+        }
+
+        renderAlbumPage();
+    </script>
+</body>
+</html>
